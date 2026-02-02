@@ -1,0 +1,18 @@
+plugins {
+    id 'java'
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'net.virtualspan.Main'
+        )
+    }
+}
+
+group = 'net.virtualspan'
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}

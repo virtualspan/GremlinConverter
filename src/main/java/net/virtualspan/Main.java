@@ -1,0 +1,654 @@
+package net.virtualspan;
+
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
+import javax.swing.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.stream.Stream;
+
+public class Main {
+    static void main() {
+        // Get spritesheet and sounds folder paths
+        Path spriteSheetFolder = null;
+        Path soundFolder = null;
+
+        // Prompt user to select
+        while (spriteSheetFolder == null || soundFolder == null) {
+            // Build the options list dynamically
+            List<String> optionList = new ArrayList<>();
+
+            if (spriteSheetFolder == null) optionList.add("Spritesheet Folder");
+            if (soundFolder == null) optionList.add("Sounds Folder");
+            optionList.add("Cancel");
+
+            Object[] options = optionList.toArray();
+
+            int choice = JOptionPane.showOptionDialog(
+                    null,
+                    """
+                            Select the gremlin folders needed for conversion:
+                            The spritesheet folder should resemble `SpriteSheet/Gremlins/<Gremlin-name>`
+                            and the sounds folder should resemble `Sounds/<Gremlin-name>`
+                            """,
+                    "Folder Selection",
+                    JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+            );
+
+            String selected = (String) options[choice];
+
+            switch (selected) {
+                case "Spritesheet Folder" -> {
+                    JFileChooser chooser = new JFileChooser();
+                    chooser.setDialogTitle("Select Spritesheet Folder");
+                    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                        spriteSheetFolder = chooser.getSelectedFile().toPath();
+                    } else {
+                        userCancel();
+                    }
+                }
+
+                case "Sounds Folder" -> {
+                    JFileChooser chooser = new JFileChooser();
+                    chooser.setDialogTitle("Select Sounds Folder");
+                    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                        soundFolder = chooser.getSelectedFile().toPath();
+                    } else {
+                        userCancel();
+                    }
+                }
+
+                default -> userCancel();
+            }
+        }
+
+        // Get folder name
+        String folderName = spriteSheetFolder.getFileName().toString();
+        String normalized = folderName.toLowerCase().replace(" ", "-");
+
+        // File Paths
+        Path spriteExportFolder = spriteSheetFolder.resolve("Converted sprite textures");
+        Path convertedSpriteFolder = spriteExportFolder.resolve(normalized);
+        Path soundExportFolder = soundFolder.resolve("Converted sprite textures");
+        Path convertedSoundFolder = soundExportFolder.resolve(normalized);
+        Path originalConfigPath = spriteSheetFolder.resolve("config.txt");
+        Path frameCountPath = convertedSpriteFolder.resolve("frame-count.json");
+        Path spriteMapPath = convertedSpriteFolder.resolve("sprite-map.json");
+        Path emoteConfigPath = convertedSpriteFolder.resolve("emote-config.json");
+        Path sfxMapPath = convertedSoundFolder.resolve("sfx-map.json");
+
+        // Export Folder Paths
+        Path userConfigDir = Path.of(System.getProperty("user.home"), ".config", "linux-desktop-gremlin");
+        Path spriteSheetDir = userConfigDir.resolve("spritesheet");
+        Path soundsDir = userConfigDir.resolve("sounds");
+
+
+    if (!Files.exists(originalConfigPath)) {
+        // If config file isn't present, outputs message
+        JOptionPane.showMessageDialog(
+                null,
+                "config.txt was not found.\n" +
+                        "Please make sure you are selecting the correct sprite folder.",
+                "Missing Config File",
+                JOptionPane.ERROR_MESSAGE
+        );
+
+        throw new RuntimeException("config.txt not found");
+    } else if (!Files.exists(spriteSheetFolder.resolve("Actions/idle.png"))) {
+        // If config file isn't present, outputs message
+        JOptionPane.showMessageDialog(
+                null,
+                "idle.png was not found in the sprite folder.\n" +
+                        "The Gremlin you have chosen is most likely incompatible.",
+                "Missing idle.png File",
+                JOptionPane.ERROR_MESSAGE
+        );
+
+        throw new RuntimeException("Actions/idle.png not found");
+    } else {
+        Scanner scanner = new Scanner(System.in);
+
+        // Sprite Options for the dropdown menu
+        List<String> spriteOptionsBuilder = new ArrayList<>();
+        spriteOptionsBuilder.add("default");
+        String[] emoteDirs = {
+                "Emotes/emote1.png",
+                "Emotes/emote2.png",
+                "Emotes/emote3.png",
+                "Emotes/emote4.png",
+                "Actions/click.png"
+        };
+        for (String option : emoteDirs) {
+            Path p = spriteSheetFolder.resolve(option);
+            if (Files.exists(p)) {
+                spriteOptionsBuilder.add(option);
+            }
+        }
+        spriteOptionsBuilder.add("Actions/idle.png");
+        String[] spriteOptions = spriteOptionsBuilder.toArray(new String[0]);
+
+        // Sound Options for the dropdown menu
+        String[] soundOptions = {
+                "default",
+                "emote1.wav",
+                "emote3.wav"
+        };
+
+
+
+        String home = System.getProperty("user.home");
+        String patSound;
+        String emoteSoundChoice = "default";
+        String emoteSpriteChoice = "default";
+        String patSpriteChoice = "default";
+        String emoteSpriteDefault;
+        String patSpriteDefault;
+        String pokeSprite;
+
+        // Edge case scenarios
+        if (Files.exists(spriteSheetFolder.resolve("Emotes/emote3.png"))) {
+            emoteSpriteDefault = "Emotes/emote3.png";
+        } else {
+            emoteSpriteDefault = "Emotes/emote1.png";
+        }
+
+        if (Files.exists(spriteSheetFolder.resolve("Emotes/emote1.png"))) {
+            patSpriteDefault = "Emotes/emote1.png";
+        } else {
+            patSpriteDefault = "Emotes/emote2.png";
+        }
+
+        if (Files.exists(spriteSheetFolder.resolve("Actions/click.png"))) {
+            pokeSprite = "Actions/click.png";
+        } else if (Files.exists(spriteSheetFolder.resolve("Emotes/emote2.png"))) {
+            pokeSprite = "Emotes/emote2.png";
+        } else {
+            pokeSprite = "Emotes/emote1.png";
+        }
+
+        if (Files.exists(soundFolder.resolve("emote1.wav")) && !Files.exists(soundFolder.resolve("emote3.wav"))) {
+            emoteSoundChoice = "emote1.wav";
+        } else if (Files.exists(soundFolder.resolve("emote3.wav")) && !Files.exists(soundFolder.resolve("emote1.wav"))) {
+            emoteSoundChoice = "emote3.wav";
+        }
+
+        // Sets pat.wav to the pat sound if available
+        if (Files.exists(soundFolder.resolve("pat.wav"))) {
+            patSound = "pat.wav";
+        } else if (Files.exists(soundFolder.resolve("emote4.wav"))) {
+            patSound = "emote4.wav";
+        } else {
+            patSound = "emote2.wav";
+        }
+
+        // Allows user to customize sprites/sounds, but skips if not needed
+        if (Files.exists(spriteSheetFolder.resolve("Emotes/emote1.png"))
+                || Files.exists(spriteSheetFolder.resolve("Emotes/emote2.png"))
+                || Files.exists(spriteSheetFolder.resolve("Emotes/emote3.png"))
+                || Files.exists(spriteSheetFolder.resolve("Emotes/emote4.png"))) {
+            emoteSpriteChoice = chooseSprite("Choose sprite for the emote animation:\n" +
+                    "default = " + emoteSpriteDefault + "\n" +
+                    "(directories are shown relative to:\n" + spriteSheetFolder.toString().replaceFirst(home, "~") + ")",
+                    "Choose sprite", spriteOptions);
+
+            patSpriteChoice = chooseSprite("Choose sprite for the pat animation:\n" +
+                    "default = " + patSpriteDefault + "\n" +
+                    "(directories are shown relative to:\n" + spriteSheetFolder.toString().replaceFirst(home, "~") + ")",
+                    "Choose sprite", spriteOptions);
+        }
+
+        if (Files.exists(soundFolder.resolve("emote1.wav"))
+                && Files.exists(soundFolder.resolve("emote3.wav"))) {
+            emoteSoundChoice = chooseSprite("Choose sound for the emote animation:\n" +
+                     "default = emote1.wav\n" +
+                     "(directories are shown relative to:\n" + soundFolder.toString().replaceFirst(home, "~") + ")",
+                    "Choose sound", soundOptions);
+        }
+
+        if (emoteSpriteChoice.equals("default")) {
+            emoteSpriteChoice = emoteSpriteDefault;
+        }
+        if (patSpriteChoice.equals("default")) {
+            patSpriteChoice = patSpriteDefault;
+        }
+        if (emoteSoundChoice.equals("default")) {
+            emoteSoundChoice = "emote1.wav";
+        }
+
+
+        // Make sure the folders exist
+        try {
+            Files.createDirectories(spriteExportFolder);
+            Files.createDirectories(convertedSpriteFolder);
+            Files.createDirectories(soundExportFolder);
+            Files.createDirectories(convertedSoundFolder);
+        } catch (IOException e) {
+            ioExceptionPrompt("Failed to create export/converterted sprite/sound directory", e);
+        }
+
+        // Paths to directories containing sprites
+        Path actions = spriteSheetFolder.resolve("Actions");
+        Path emotes = spriteSheetFolder.resolve("Emotes");
+        Path run = spriteSheetFolder.resolve("Run");
+        Path walk = spriteSheetFolder.resolve("Walk");
+
+        // Copies and renames hover.png or idle.png to intro.png and outro.png as a placeholder if they aren't present
+        // This fixes issues with starting/closing the Gremlin
+        String introSprite = "intro.png";
+        String outroSprite = "outro.png";
+
+        try {
+            if (!Files.exists(actions.resolve("intro.png"))) {
+                Files.copy(actions.resolve("idle.png"),
+                        convertedSpriteFolder.resolve("intro.png"), StandardCopyOption.REPLACE_EXISTING);
+
+                introSprite = "idle.png";
+            }
+
+            if (!Files.exists(actions.resolve("outro.png"))) {
+                if (Files.exists(actions.resolve("hover.png"))) {
+                    Files.copy(actions.resolve("grab.png"),
+                            convertedSpriteFolder.resolve("outro.png"), StandardCopyOption.REPLACE_EXISTING);
+
+                    outroSprite = "grab.png";
+                } else {
+                    Files.copy(actions.resolve("idle.png"),
+                            convertedSpriteFolder.resolve("outro.png"), StandardCopyOption.REPLACE_EXISTING);
+
+                    outroSprite = "idle.png";
+                }
+            }
+        } catch (IOException e) {
+            ioExceptionPrompt("Failed to copy and rename to intro/outro.png placeholder files", e);
+        }
+
+        // List of copy operations
+        List<Path[]> copies = List.of(
+                // Actions folder
+                new Path[]{actions.resolve("grab.png"), convertedSpriteFolder.resolve("grab.png")},
+                new Path[]{actions.resolve("hover.png"), convertedSpriteFolder.resolve("hover.png")},
+                new Path[]{actions.resolve("idle.png"), convertedSpriteFolder.resolve("idle.png")},
+                new Path[]{actions.resolve(introSprite), convertedSpriteFolder.resolve("intro.png")},
+                new Path[]{actions.resolve(outroSprite), convertedSpriteFolder.resolve("outro.png")},
+                new Path[]{actions.resolve("runIdle.png"), convertedSpriteFolder.resolve("walk-idle.png")},
+                new Path[]{actions.resolve("sleep.png"), convertedSpriteFolder.resolve("sleep.png")},
+
+                // Emotes folder
+                new Path[]{emotes.resolve("emote1.png"), convertedSpriteFolder.resolve("emote1.png")},
+                new Path[]{emotes.resolve("emote2.png"), convertedSpriteFolder.resolve("emote2.png")},
+                new Path[]{emotes.resolve("emote3.png"), convertedSpriteFolder.resolve("emote3.png")},
+                new Path[]{emotes.resolve("emote4.png"), convertedSpriteFolder.resolve("emote4.png")},
+
+                // Emote and idle sprites converted to other files
+                new Path[]{spriteSheetFolder.resolve(emoteSpriteChoice), convertedSpriteFolder.resolve("emote.png")},
+                new Path[]{spriteSheetFolder.resolve(patSpriteChoice), convertedSpriteFolder.resolve("pat.png")},
+                new Path[]{spriteSheetFolder.resolve(pokeSprite), convertedSpriteFolder.resolve("poke.png")},
+
+                // Run folder
+                new Path[]{run.resolve("downLeft.png"), convertedSpriteFolder.resolve("run-downleft.png")},
+                new Path[]{run.resolve("downRight.png"), convertedSpriteFolder.resolve("run-downright.png")},
+                new Path[]{run.resolve("runDown.png"), convertedSpriteFolder.resolve("run-down.png")},
+                new Path[]{run.resolve("runLeft.png"), convertedSpriteFolder.resolve("run-left.png")},
+                new Path[]{run.resolve("runRight.png"), convertedSpriteFolder.resolve("run-right.png")},
+                new Path[]{run.resolve("runUp.png"), convertedSpriteFolder.resolve("run-up.png")},
+                new Path[]{run.resolve("upLeft.png"), convertedSpriteFolder.resolve("run-upleft.png")},
+                new Path[]{run.resolve("upRight.png"), convertedSpriteFolder.resolve("run-upright.png")},
+
+                // Walk folder
+                new Path[]{walk.resolve("walkDown.png"), convertedSpriteFolder.resolve("walk-down.png")},
+                new Path[]{walk.resolve("walkLeft.png"), convertedSpriteFolder.resolve("walk-left.png")},
+                new Path[]{walk.resolve("walkRight.png"), convertedSpriteFolder.resolve("walk-right.png")},
+                new Path[]{walk.resolve("walkUp.png"), convertedSpriteFolder.resolve("walk-up.png")},
+
+                // Sounds folder
+                new Path[]{soundFolder.resolve("emote.wav"), convertedSoundFolder.resolve("emote.wav")},
+                new Path[]{soundFolder.resolve("grab.wav"), convertedSoundFolder.resolve("grab.wav")},
+                new Path[]{soundFolder.resolve("hover.wav"), convertedSoundFolder.resolve("hover.wav")},
+                new Path[]{soundFolder.resolve("intro.wav"), convertedSoundFolder.resolve("intro.wav")},
+                new Path[]{soundFolder.resolve("outro.wav"), convertedSoundFolder.resolve("outro.wav")},
+                new Path[]{soundFolder.resolve("pat.wav"), convertedSoundFolder.resolve("pat.wav")},
+                new Path[]{soundFolder.resolve("poke.wav"), convertedSoundFolder.resolve("poke.wav")},
+                new Path[]{soundFolder.resolve("run.wav"), convertedSoundFolder.resolve("run.wav")},
+                new Path[]{soundFolder.resolve("sleep.wav"), convertedSoundFolder.resolve("sleep.wav")},
+                new Path[]{soundFolder.resolve("walk.wav"), convertedSoundFolder.resolve("walk.wav")},
+
+                // Emote and other sounds (these sometimes don't have an original sound to copy and need placeholders)
+                new Path[]{soundFolder.resolve(emoteSoundChoice), convertedSoundFolder.resolve("emote.wav")},
+                new Path[]{soundFolder.resolve("emote2.wav"), convertedSoundFolder.resolve("poke.wav")},
+                new Path[]{soundFolder.resolve(patSound), convertedSoundFolder.resolve("pat.wav")}
+        );
+
+        // Perform all copies
+        for (Path[] pair : copies) {
+            try {
+                copyFile(pair[0], pair[1]);
+            } catch (IOException e) {
+                ioExceptionPrompt("Failed copying from " + pair[0] + " to " + pair[1], e);
+            }
+        }
+
+        // Read config.txt
+        Map<String, Integer> values = new HashMap<>();
+
+        try (Stream<String> lines = Files.lines(originalConfigPath)) {
+            lines.forEach(line -> {
+                line = line.trim();
+
+                // Skip comments and empty lines
+                if (line.isEmpty() || line.startsWith("//")) return;
+
+                // Skip SCALE
+                if (line.startsWith("SCALE")) return;
+
+                // Expect KEY=value
+                String[] parts = line.split("=");
+                if (parts.length != 2) return;
+
+                String key = parts[0].trim();
+                String val = parts[1].trim();
+
+                try {
+                    values.put(key, Integer.parseInt(val));
+                } catch (NumberFormatException ignored) {
+                    // Skip non-integer values
+                }
+            });
+        } catch (IOException e) {
+            ioExceptionPrompt("Failed to read config.txt", e);
+        }
+
+        // Sync choices/sprites with the equivalent key for proper frame count
+        String emoteKey = convertSpriteToKey(emoteSpriteChoice);
+        String patKey = convertSpriteToKey(patSpriteChoice);
+        String pokeKey = convertSpriteToKey(pokeSprite);
+        String introKey = convertSpriteToKey(introSprite);
+        String outroKey = convertSpriteToKey(outroSprite);
+
+        // Calculate emote duration for emote config
+        Path soundFile = soundFolder.resolve(emoteSoundChoice);
+        File file = soundFile.toFile();
+        AudioInputStream ais = null;
+        int durationMs;
+        try {
+            ais = AudioSystem.getAudioInputStream(file);
+        } catch (UnsupportedAudioFileException | IOException e) {
+            JOptionPane.showMessageDialog(
+                    null,
+                    """
+                    Could not find emote sound file/could not read.
+                    This could either be caused by selecting the wrong sound folder,
+                    or if a Gremlin doesn't have an emote sound (this is common in
+                    less popular gremlins such as Durandal who have incomplete
+                    sprites and sounds)
+                    
+                    Proceeding without emote sound
+                    """,
+                    "Conversion Warning",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        }
+        AudioFormat format;
+        if (ais != null) {
+            format = ais.getFormat();
+
+            long frames = ais.getFrameLength();
+            float frameRate = format.getFrameRate();
+
+            durationMs = (int) Math.ceil((frames / frameRate) * 1000);
+        } else {
+            durationMs = 0;
+        }
+
+        // Create File contents
+        List<String> jsonLines = new ArrayList<>();
+
+        jsonLines.add("    \"FrameRate\": 60");
+        jsonLines.add("    \"SpriteColumn\": " + get(values, "COLUMN"));
+        jsonLines.add("    \"FrameHeight\": " + get(values, "HEIGHT"));
+        jsonLines.add("    \"FrameWidth\": " + get(values, "WIDTH"));
+        jsonLines.add("    \"TopHotspotHeight\": 175");
+        jsonLines.add("    \"TopHotspotWidth\": 150");
+        jsonLines.add("    \"SideHotspotHeight\": 0");
+        jsonLines.add("    \"SideHotspotWidth\": 0");
+        jsonLines.add("    \"HasReloadAnimation\": false");
+
+        List<SpriteEntry> entries = List.of(
+                new SpriteEntry("Idle", "idle.png"),
+                new SpriteEntry("Hover", "hover.png"),
+                new SpriteEntry("Sleep", "sleep.png"),
+                new SpriteEntry("Intro", "intro.png"),
+                new SpriteEntry("Outro", "outro.png"),
+                new SpriteEntry("Grab", "grab.png"),
+                new SpriteEntry("Up", "run-up.png"),
+                new SpriteEntry("Down", "run-down.png"),
+                new SpriteEntry("Left", "run-left.png"),
+                new SpriteEntry("Right", "run-right.png"),
+                new SpriteEntry("UpLeft", "run-upleft.png"),
+                new SpriteEntry("UpRight", "run-upright.png"),
+                new SpriteEntry("DownLeft", "run-downleft.png"),
+                new SpriteEntry("DownRight", "run-downright.png"),
+                new SpriteEntry("WalkIdle", "walk-idle.png"),
+                new SpriteEntry("Poke", "poke.png"),
+                new SpriteEntry("Pat", "pat.png"),
+                new SpriteEntry("LeftAction", "left-action.png"),
+                new SpriteEntry("RightAction", "right-action.png"),
+                new SpriteEntry("Reload", "reload.png"),
+                new SpriteEntry("Emote", "emote.png")
+        );
+
+        for (SpriteEntry entry : entries) {
+            Path currentFile = convertedSpriteFolder.resolve(entry.fileName());
+            String value = Files.exists(currentFile) ? entry.fileName() : "";
+            jsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
+        }
+
+        String spriteSheetFile =
+                "{\n" +
+                        String.join(",\n", jsonLines) +
+                        "\n}";
+
+
+        String frameCountFile = "{\n" +
+                "    \"Idle\": " + get(values, "IDLE") + ",\n" +
+                "    \"Hover\": " + get(values, "HOVER") + ",\n" +
+                "    \"Sleep\": " + get(values, "SLEEP") + ",\n" +
+                "    \"Intro\": " + get(values, introKey) + ",\n" +
+                "    \"Outro\": " + get(values, outroKey) + ",\n" +
+                "    \"Grab\": " + get(values, "GRAB") + ",\n" +
+                "    \"Up\": " + get(values, "RUNUP") + ",\n" +
+                "    \"Down\": " + get(values, "RUNDOWN") + ",\n" +
+                "    \"Left\": " + get(values, "RUNLEFT") + ",\n" +
+                "    \"Right\": " + get(values, "RUNRIGHT") + ",\n" +
+                "    \"UpLeft\": " + get(values, "UPLEFT") + ",\n" +
+                "    \"UpRight\": " + get(values, "UPRIGHT") + ",\n" +
+                "    \"DownLeft\": " + get(values, "DOWNLEFT") + ",\n" +
+                "    \"DownRight\": " + get(values, "DOWNRIGHT") + ",\n" +
+                "    \"WalkIdle\": " + get(values, "RUNIDLE") + ",\n" +
+                "    \"Poke\": " + get(values, pokeKey) + ",\n" +
+                "    \"Pat\": " + get(values, patKey) + ",\n" +
+                "    \"LeftAction\": 0,\n" +
+                "    \"RightAction\": 0,\n" +
+                "    \"Reload\": 0,\n" +
+                "    \"Emote\": " + get(values, emoteKey) + "\n" +
+                "}";
+
+        String emoteConfigFile =
+                "{\n" +
+                        "    \"AnnoyEmote\": true,\n" +
+                        "    \"MinEmoteTriggerMinutes\": 5,\n" +
+                        "    \"MaxEmoteTriggerMinutes\": 15,\n" +
+                        "    \"EmoteDuration\": " + durationMs + "\n" +
+                        "}";
+
+        String sfxMapFile = """
+                    {
+                        "Hover": "hover.wav",
+                        "Intro": "intro.wav",
+                        "Outro": "outro.wav",
+                        "Grab": "grab.wav",
+                        "Walk": "walk.wav",
+                        "Poke": "poke.wav",
+                        "Pat": "pat.wav",
+                        "LeftAction": "left-action.wav",
+                        "RightAction": "right-action.wav",
+                        "Reload": "outro.wav",
+                        "Emote": "emote.wav"
+                    }""";
+
+        // Write files
+        try {
+            Files.writeString(frameCountPath, frameCountFile);
+            Files.writeString(spriteMapPath, spriteSheetFile);
+            Files.writeString(emoteConfigPath, emoteConfigFile);
+            Files.writeString(sfxMapPath, sfxMapFile);
+        } catch (IOException e) {
+            ioExceptionPrompt("Failed to write frame-count/sprite-sheet/emote-config/sfx-map file", e);
+        }
+
+
+        boolean spritesheetExists = Files.isDirectory(spriteSheetDir);
+        boolean soundsExists = Files.isDirectory(soundsDir);
+
+        if (spritesheetExists && soundsExists) {
+            try {
+                copyFolder(convertedSpriteFolder, spriteSheetDir.resolve(normalized));
+                copyFolder(convertedSoundFolder, soundsDir.resolve(normalized));
+            } catch (IOException e) {
+                ioExceptionPrompt("Failed to copy converted files to .config directory (even tho it exists)", e);
+            }
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Converted files successfully!\n" +
+                            "These have automatically been copied to `.config/linux-desktop-gremlin`\n" +
+                            "and **should now be available in the Gremlin Picker!**\n" +
+                            "\n" +
+                            "The converted spritesheet folder is in:\n`" + convertedSpriteFolder.toString().replaceFirst(home, "~") + "`\n" +
+                            "and the converted sounds folder is in:\n`" + convertedSoundFolder.toString().replaceFirst(home, "~") + "`\n",
+                    "Conversion finished!",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        } else {
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Converted files successfully!\n" +
+                            "The converted spritesheet folder is in:\n`" + convertedSpriteFolder.toString().replaceFirst(home, "~") + "`\n" +
+                            "and the converted sounds folder is in:\n`" + convertedSoundFolder.toString().replaceFirst(home, "~") + "`\n",
+                    "Conversion finished!",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        }
+
+        scanner.close();
+        }
+    }
+    static void copyFile(Path from, Path to) throws IOException {
+        if (!Files.exists(from)) {
+            return; // Skip missing files
+        }
+
+        Files.createDirectories(to.getParent());
+        Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void copyFolder(Path source, Path target) throws IOException {
+        try (Stream<Path> stream = Files.walk(source)) {
+            stream.forEach(path -> {
+                try {
+                    Path relative = source.relativize(path);
+                    Path destination = target.resolve(relative);
+
+                    if (Files.isDirectory(path)) {
+                        Files.createDirectories(destination);
+                    } else {
+                        Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    ioExceptionPrompt("Failed to copy folder at:" + path, e);
+                }
+            });
+        }
+    }
+
+    private static String chooseSprite(String message, String title, String[] Options) {
+        String selectedDisplay = (String) JOptionPane.showInputDialog(
+                null,
+                message,
+                title,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                Options,
+                Options[0]
+        );
+
+        if (selectedDisplay == null) {
+            userCancel();
+        }
+
+        return selectedDisplay;
+    }
+
+    private static int get(Map<String, Integer> map, String key) {
+        return map.getOrDefault(key, 0);
+    }
+
+    private static String convertSpriteToKey(String choice) {
+        return switch (choice) {
+            case "Emotes/emote1.png" -> "EMOTE1";
+            case "Emotes/emote2.png" -> "EMOTE2";
+            case "Emotes/emote3.png" -> "EMOTE3";
+            case "Emotes/emote4.png" -> "EMOTE4";
+            case "Actions/idle.png"  -> "IDLE";
+            case "Actions/click.png"  -> "CLICK";
+            case "intro.png"  -> "INTRO";
+            case "outro.png"  -> "OUTRO";
+            case "grab.png"  -> "GRAB";
+            default -> null;
+        };
+    }
+
+    private record SpriteEntry(String key, String fileName) {}
+
+    private static void userCancel() {
+        // Happens if user clicks cancel
+        JOptionPane.showMessageDialog(
+                null,
+                "Conversion cancelled by user",
+                "Conversion Cancelled",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+
+        throw new CancellationException("User cancelled conversion");
+    }
+
+    private static void ioExceptionPrompt(String message, IOException e) {
+        // Happens if user clicks cancel
+        JOptionPane.showMessageDialog(
+                null,
+                "An unexpected file operation error occurred. This shouldn’t happen during normal use. Please report this issue.",
+                "Conversion Failed",
+                JOptionPane.ERROR_MESSAGE
+        );
+
+        throw new RuntimeException(
+                "\n\nUnexpected IOException: " + message +
+                        "\nCause: " + e.getMessage() + "\n\n",
+                e
+        );
+    }
+}
