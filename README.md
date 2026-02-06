@@ -9,6 +9,8 @@ In case it wasn't clear, this should work for all Gremlins (except Koyuki mentio
 IMPORTANT: Some Gremlins have their sprites found in both `SpriteSheet/Gremlins/<Gremlin-name>` and `SpriteSheet/Companions/<Gremlin-name>`. In this case make sure to use the sprites from `SpriteSheet/Gremlins/<Gremlin-name>` as the ones in the `Companions` folder typically has less sprites.
 
 ## Download
+**Requires Java 25**
+
 Check releases and download the .jar file from there.
 
 ## Incompatible Gremlins
