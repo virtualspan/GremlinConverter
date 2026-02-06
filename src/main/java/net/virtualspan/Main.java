@@ -77,26 +77,26 @@ public class Main {
             }
         }
 
-        // Get folder name
+        // Get folder name for gremlin
         String folderName = spriteSheetFolder.getFileName().toString();
         String normalized = folderName.toLowerCase().replace(" ", "-");
 
+        // Export Folder Paths
+        Path exportFolder = Path.of(System.getProperty("user.home"), "ConvertedGremlins");
+        Path gremlinFolder = exportFolder.resolve(normalized);
+        Path convertedSpriteFolder = gremlinFolder.resolve("sprites");
+        Path convertedSoundFolder = gremlinFolder.resolve("sounds");
+
         // File Paths
-        Path spriteExportFolder = spriteSheetFolder.resolve("Converted sprite textures");
-        Path convertedSpriteFolder = spriteExportFolder.resolve(normalized);
-        Path soundExportFolder = soundFolder.resolve("Converted sprite textures");
-        Path convertedSoundFolder = soundExportFolder.resolve(normalized);
         Path originalConfigPath = spriteSheetFolder.resolve("config.txt");
         Path frameCountPath = convertedSpriteFolder.resolve("frame-count.json");
         Path spriteMapPath = convertedSpriteFolder.resolve("sprite-map.json");
         Path emoteConfigPath = convertedSpriteFolder.resolve("emote-config.json");
         Path sfxMapPath = convertedSoundFolder.resolve("sfx-map.json");
 
-        // Export Folder Paths
+        // Config Folder Paths
         Path userConfigDir = Path.of(System.getProperty("user.home"), ".config", "linux-desktop-gremlin");
-        Path spriteSheetDir = userConfigDir.resolve("spritesheet");
-        Path soundsDir = userConfigDir.resolve("sounds");
-
+        Path gremlinsDir = userConfigDir.resolve("gremlins");
 
     if (!Files.exists(originalConfigPath)) {
         // If config file isn't present, outputs message
@@ -110,7 +110,7 @@ public class Main {
 
         throw new RuntimeException("config.txt not found");
     } else if (!Files.exists(spriteSheetFolder.resolve("Actions/idle.png"))) {
-        // If config file isn't present, outputs message
+        // If idle.png sprite isn't present, outputs message
         JOptionPane.showMessageDialog(
                 null,
                 "idle.png was not found in the sprite folder.\n" +
@@ -123,7 +123,7 @@ public class Main {
     } else {
         Scanner scanner = new Scanner(System.in);
 
-        // Sprite Options for the dropdown menu
+        // Sprite Options for the dropdown menu (only shows options that exist)
         List<String> spriteOptionsBuilder = new ArrayList<>();
         spriteOptionsBuilder.add("default");
         String[] emoteDirs = {
@@ -149,8 +149,7 @@ public class Main {
                 "emote3.wav"
         };
 
-
-
+        // Declaring variables for below
         String home = System.getProperty("user.home");
         String patSound;
         String emoteSoundChoice = "default";
@@ -160,7 +159,7 @@ public class Main {
         String patSpriteDefault;
         String pokeSprite;
 
-        // Edge case scenarios
+        // Edge case scenarios for when some files don't exist to convert
         if (Files.exists(spriteSheetFolder.resolve("Emotes/emote3.png"))) {
             emoteSpriteDefault = "Emotes/emote3.png";
         } else {
@@ -220,6 +219,7 @@ public class Main {
                     "Choose sound", soundOptions);
         }
 
+        // Sets defaults
         if (emoteSpriteChoice.equals("default")) {
             emoteSpriteChoice = emoteSpriteDefault;
         }
@@ -231,14 +231,14 @@ public class Main {
         }
 
 
-        // Make sure the folders exist
+        // Make sure the export folders exist
         try {
-            Files.createDirectories(spriteExportFolder);
+            Files.createDirectories(exportFolder);
+            Files.createDirectories(gremlinFolder);
             Files.createDirectories(convertedSpriteFolder);
-            Files.createDirectories(soundExportFolder);
             Files.createDirectories(convertedSoundFolder);
         } catch (IOException e) {
-            ioExceptionPrompt("Failed to create export/converterted sprite/sound directory", e);
+            ioExceptionPrompt("Failed to create export directories", e);
         }
 
         // Paths to directories containing sprites
@@ -248,7 +248,7 @@ public class Main {
         Path walk = spriteSheetFolder.resolve("Walk");
 
         // Copies and renames hover.png or idle.png to intro.png and outro.png as a placeholder if they aren't present
-        // This fixes issues with starting/closing the Gremlin
+        // This fixes issues with starting/closing the Gremlin and gets overridden if they are present
         String introSprite = "intro.png";
         String outroSprite = "outro.png";
 
@@ -294,11 +294,6 @@ public class Main {
                 new Path[]{emotes.resolve("emote3.png"), convertedSpriteFolder.resolve("emote3.png")},
                 new Path[]{emotes.resolve("emote4.png"), convertedSpriteFolder.resolve("emote4.png")},
 
-                // Emote and idle sprites converted to other files
-                new Path[]{spriteSheetFolder.resolve(emoteSpriteChoice), convertedSpriteFolder.resolve("emote.png")},
-                new Path[]{spriteSheetFolder.resolve(patSpriteChoice), convertedSpriteFolder.resolve("pat.png")},
-                new Path[]{spriteSheetFolder.resolve(pokeSprite), convertedSpriteFolder.resolve("poke.png")},
-
                 // Run folder
                 new Path[]{run.resolve("downLeft.png"), convertedSpriteFolder.resolve("run-downleft.png")},
                 new Path[]{run.resolve("downRight.png"), convertedSpriteFolder.resolve("run-downright.png")},
@@ -314,6 +309,11 @@ public class Main {
                 new Path[]{walk.resolve("walkLeft.png"), convertedSpriteFolder.resolve("walk-left.png")},
                 new Path[]{walk.resolve("walkRight.png"), convertedSpriteFolder.resolve("walk-right.png")},
                 new Path[]{walk.resolve("walkUp.png"), convertedSpriteFolder.resolve("walk-up.png")},
+
+                // Emote and idle sprites converted to other files
+                new Path[]{spriteSheetFolder.resolve(emoteSpriteChoice), convertedSpriteFolder.resolve("emote.png")},
+                new Path[]{spriteSheetFolder.resolve(patSpriteChoice), convertedSpriteFolder.resolve("pat.png")},
+                new Path[]{spriteSheetFolder.resolve(pokeSprite), convertedSpriteFolder.resolve("poke.png")},
 
                 // Sounds folder
                 new Path[]{soundFolder.resolve("emote.wav"), convertedSoundFolder.resolve("emote.wav")},
@@ -520,35 +520,37 @@ public class Main {
             ioExceptionPrompt("Failed to write frame-count/sprite-sheet/emote-config/sfx-map file", e);
         }
 
+        // Copies gremlin to .config directory if present
+        boolean gremlinsDireExists = Files.isDirectory(gremlinsDir);
 
-        boolean spritesheetExists = Files.isDirectory(spriteSheetDir);
-        boolean soundsExists = Files.isDirectory(soundsDir);
-
-        if (spritesheetExists && soundsExists) {
+        if (gremlinsDireExists) {
             try {
-                copyFolder(convertedSpriteFolder, spriteSheetDir.resolve(normalized));
-                copyFolder(convertedSoundFolder, soundsDir.resolve(normalized));
+                copyFolder(gremlinFolder, gremlinsDir.resolve(normalized));
             } catch (IOException e) {
-                ioExceptionPrompt("Failed to copy converted files to .config directory (even tho it exists)", e);
+                ioExceptionPrompt("Failed to copy converted files to .config directory (even though it exists)", e);
             }
 
             JOptionPane.showMessageDialog(
                     null,
-                    "Converted files successfully!\n" +
-                            "These have automatically been copied to `.config/linux-desktop-gremlin`\n" +
-                            "and **should now be available in the Gremlin Picker!**\n" +
-                            "\n" +
-                            "The converted spritesheet folder is in:\n`" + convertedSpriteFolder.toString().replaceFirst(home, "~") + "`\n" +
-                            "and the converted sounds folder is in:\n`" + convertedSoundFolder.toString().replaceFirst(home, "~") + "`\n",
+                    """
+                            Converted files successfully!
+                            These have automatically been copied to `.config/linux-desktop-gremlin`
+                            and **should now be available in the Gremlin Picker!**
+                            
+                            The converted gremlin is in:
+                            `~/ConvertedGremlins`
+                            """,
                     "Conversion finished!",
                     JOptionPane.INFORMATION_MESSAGE
             );
         } else {
             JOptionPane.showMessageDialog(
                     null,
-                    "Converted files successfully!\n" +
-                            "The converted spritesheet folder is in:\n`" + convertedSpriteFolder.toString().replaceFirst(home, "~") + "`\n" +
-                            "and the converted sounds folder is in:\n`" + convertedSoundFolder.toString().replaceFirst(home, "~") + "`\n",
+                    """
+                            Converted files successfully!
+                            The converted gremlin is in:
+                            `~/ConvertedGremlins`
+                            """,
                     "Conversion finished!",
                     JOptionPane.INFORMATION_MESSAGE
             );
