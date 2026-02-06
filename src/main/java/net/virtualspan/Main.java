@@ -415,6 +415,7 @@ public class Main {
         }
 
         // Create File contents
+        // sprite-map.json
         List<String> jsonLines = new ArrayList<>();
 
         jsonLines.add("    \"FrameRate\": 60");
@@ -451,9 +452,21 @@ public class Main {
                 new SpriteEntry("Emote", "emote.png")
         );
 
+        // If the file corresponding to the sprite exists, it shows the filename as normal
+        // Else shows the filename for idle.png,
+        // except if it's LeftAction, RightAction or Reload, then it shows none
+        // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
+        Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
+
         for (SpriteEntry entry : entries) {
             Path currentFile = convertedSpriteFolder.resolve(entry.fileName());
-            String value = Files.exists(currentFile) ? entry.fileName() : "";
+
+            boolean exists = Files.exists(currentFile);
+
+            String value = exists
+                    ? entry.fileName()
+                    : (skip.contains(entry.key()) ? "" : "idle.png");
+
             jsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
         }
 
@@ -462,6 +475,14 @@ public class Main {
                         String.join(",\n", jsonLines) +
                         "\n}";
 
+        // frame-count.json
+        // The idle sprite replaces missing sprites (except LeftAction, RightAction and Reload)
+        // Therefore, this makes the frame count sync by using the idle frame count for them
+        for (String key : values.keySet()) {
+            if (get(values, key) == 0 && !skip.contains(key)) {
+                values.put(key, get(values, "IDLE"));
+            }
+        }
 
         String frameCountFile = "{\n" +
                 "    \"Idle\": " + get(values, "IDLE") + ",\n" +
@@ -487,6 +508,7 @@ public class Main {
                 "    \"Emote\": " + get(values, emoteKey) + "\n" +
                 "}";
 
+        // emote-config.json
         String emoteConfigFile =
                 "{\n" +
                         "    \"AnnoyEmote\": true,\n" +
@@ -495,6 +517,7 @@ public class Main {
                         "    \"EmoteDuration\": " + durationMs + "\n" +
                         "}";
 
+        // sfx-map.json
         String sfxMapFile = """
                     {
                         "Hover": "hover.wav",
