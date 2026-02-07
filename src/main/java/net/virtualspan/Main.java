@@ -143,16 +143,16 @@ public class Main {
         // Sprite Options for the dropdown menu (only shows options that exist)
         List<String> spriteOptionsBuilder = new ArrayList<>();
         spriteOptionsBuilder.add("default");
-        String[] emoteDirs = {
+        String[] spriteDirs = {
                 "Emotes/emote1.png",
                 "Emotes/emote2.png",
                 "Emotes/emote3.png",
                 "Emotes/emote4.png",
                 "Actions/click.png"
         };
-        for (String option : emoteDirs) {
-            Path p = spriteSheetFolder.resolve(option);
-            if (Files.exists(p)) {
+        for (String option : spriteDirs) {
+            Path filePath = spriteSheetFolder.resolve(option);
+            if (Files.exists(filePath)) {
                 spriteOptionsBuilder.add(option);
             }
         }
@@ -160,11 +160,24 @@ public class Main {
         String[] spriteOptions = spriteOptionsBuilder.toArray(new String[0]);
 
         // Sound Options for the dropdown menu
-        String[] soundOptions = {
-                "default",
+        List<String> soundOptionsBuilder = new ArrayList<>();
+        soundOptionsBuilder.add("default");
+
+        String[] soundFiles = {
                 "emote1.wav",
-                "emote3.wav"
+                "emote2.wav",
+                "emote3.wav",
+                "emote4.wav"
         };
+
+        for (String option : soundFiles) {
+            Path filePath = soundFolder.resolve(option);
+            if (Files.exists(filePath)) {
+                soundOptionsBuilder.add(option);
+            }
+        }
+
+        String[] soundOptions = soundOptionsBuilder.toArray(new String[0]);
 
         // Declaring variables for below
         String home = System.getProperty("user.home");
