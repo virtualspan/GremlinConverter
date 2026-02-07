@@ -124,8 +124,8 @@ public class Main {
         );
 
         throw new RuntimeException("Actions/idle.png not found");
-    } else if (!Files.exists(soundFolder.resolve("intro.wav")) && !Files.exists(soundFolder.resolve("grab.wav"))) {
-        // If intro.wav and grab.wav aren't present (which are in every sound folder), stops converter
+    } else if (!Files.exists(soundFolder.resolve("intro.wav"))) {
+        // If intro.wav is not present (which is in every sound folder), stops converter
         JOptionPane.showMessageDialog(
                 null,
                 """
@@ -136,7 +136,7 @@ public class Main {
                 JOptionPane.ERROR_MESSAGE
         );
 
-        throw new RuntimeException("intro.wav and grab.wav not found. Most likely an incorrect sound folder was selected");
+        throw new RuntimeException("intro.wav was not found. An incorrect sound folder was most likely selected");
     } else {
         Scanner scanner = new Scanner(System.in);
 
@@ -268,7 +268,6 @@ public class Main {
         // Paths to directories containing sprites
         Path actions = spriteSheetFolder.resolve("Actions");
         Path run = spriteSheetFolder.resolve("Run");
-        Path walk = spriteSheetFolder.resolve("Walk");
 
         // Copies and renames hover.png or idle.png to intro.png and outro.png as a placeholder if they aren't present
         // This fixes issues with starting/closing the Gremlin and gets overridden if they are present
@@ -320,12 +319,6 @@ public class Main {
                 new Path[]{run.resolve("runUp.png"), convertedSpriteFolder.resolve("run-up.png")},
                 new Path[]{run.resolve("upLeft.png"), convertedSpriteFolder.resolve("run-upleft.png")},
                 new Path[]{run.resolve("upRight.png"), convertedSpriteFolder.resolve("run-upright.png")},
-
-                // Walk folder
-                new Path[]{walk.resolve("walkDown.png"), convertedSpriteFolder.resolve("walk-down.png")},
-                new Path[]{walk.resolve("walkLeft.png"), convertedSpriteFolder.resolve("walk-left.png")},
-                new Path[]{walk.resolve("walkRight.png"), convertedSpriteFolder.resolve("walk-right.png")},
-                new Path[]{walk.resolve("walkUp.png"), convertedSpriteFolder.resolve("walk-up.png")},
 
                 // Emote and idle sprites converted to other files
                 new Path[]{spriteSheetFolder.resolve(emoteSpriteChoice), convertedSpriteFolder.resolve("emote.png")},
@@ -402,21 +395,7 @@ public class Main {
         int durationMs;
         try {
             ais = AudioSystem.getAudioInputStream(file);
-        } catch (UnsupportedAudioFileException | IOException e) {
-            JOptionPane.showMessageDialog(
-                    null,
-                    """
-                    Could not find emote sound file/could not read.
-                    This could either be caused by selecting the wrong sound folder,
-                    or if a Gremlin doesn't have an emote sound (this is common in
-                    less popular gremlins such as Durandal who have incomplete
-                    sprites and sounds)
-                    
-                    Proceeding without emote sound
-                    """,
-                    "Conversion Warning",
-                    JOptionPane.WARNING_MESSAGE
-            );
+        } catch (UnsupportedAudioFileException | IOException _) {
         }
         AudioFormat format;
         if (ais != null) {
@@ -474,6 +453,19 @@ public class Main {
         // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
         Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
 
+        Set<String> movement = Set.of(
+                "Up", "Down", "Left", "Right",
+                "UpLeft", "UpRight", "DownLeft", "DownRight"
+        );
+
+        String runRightIfExists;
+
+        if (Files.exists(convertedSpriteFolder.resolve("run-right.png"))) {
+            runRightIfExists = "run-right.png";
+        } else {
+            runRightIfExists = "idle.png";
+        }
+
         for (AssetEntry entry : spriteEntryList) {
             Path currentSpriteFile = convertedSpriteFolder.resolve(entry.fileName());
 
@@ -481,7 +473,12 @@ public class Main {
 
             String value = exists
                     ? entry.fileName()
-                    : (skip.contains(entry.key()) ? "" : "idle.png");
+                    : (skip.contains(entry.key())
+                        ? ""
+                        : movement.contains(entry.key())
+                            ? runRightIfExists
+                            : "idle.png"
+                    );
 
             spriteJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
         }
@@ -497,6 +494,20 @@ public class Main {
         for (String key : values.keySet()) {
             if (get(values, key) == 0 && !skip.contains(key)) {
                 values.put(key, get(values, "IDLE"));
+            }
+        }
+
+        // Movement sprites fall back to run-right.png if it exists, so this syncs frame count for that
+        Set<String> movementKeys = Set.of(
+                "RUNUP", "RUNDOWN", "RUNLEFT", "RUNRIGHT",
+                "UPLEFT", "UPRIGHT", "DOWNLEFT", "DOWNRIGHT"
+        );
+
+        if (Files.exists(convertedSpriteFolder.resolve("run-right.png"))) {
+            int runRightFrames = get(values, "RUNRIGHT");
+
+            for (String key : movementKeys) {
+                values.put(key, runRightFrames);
             }
         }
 
