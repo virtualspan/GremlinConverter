@@ -99,27 +99,44 @@ public class Main {
         Path gremlinsDir = userConfigDir.resolve("gremlins");
 
     if (!Files.exists(originalConfigPath)) {
-        // If config file isn't present, outputs message
+        // If config file isn't present, stops converter
         JOptionPane.showMessageDialog(
                 null,
-                "config.txt was not found.\n" +
-                        "Please make sure you are selecting the correct sprite folder.",
+                """
+                        config.txt was not found.
+                        Please make sure you are selecting the correct sprite folder.
+                        """,
                 "Missing Config File",
                 JOptionPane.ERROR_MESSAGE
         );
 
         throw new RuntimeException("config.txt not found");
     } else if (!Files.exists(spriteSheetFolder.resolve("Actions/idle.png"))) {
-        // If idle.png sprite isn't present, outputs message
+        // If idle.png isn't present, stops converter
         JOptionPane.showMessageDialog(
                 null,
-                "idle.png was not found in the sprite folder.\n" +
-                        "The Gremlin you have chosen is most likely incompatible.",
+                """
+                        idle.png was not found in the sprite folder.
+                        The Gremlin you have chosen is most likely incompatible.
+                        """,
                 "Missing idle.png File",
                 JOptionPane.ERROR_MESSAGE
         );
 
         throw new RuntimeException("Actions/idle.png not found");
+    } else if (!Files.exists(soundFolder.resolve("intro.wav")) && !Files.exists(soundFolder.resolve("grab.wav"))) {
+        // If intro.wav and grab.wav aren't present (which are in every sound folder), stops converter
+        JOptionPane.showMessageDialog(
+                null,
+                """
+                        Sound files are not present!.
+                        You selected the wrong sound folder.
+                        """,
+                "Incorrect Sound folder selected",
+                JOptionPane.ERROR_MESSAGE
+        );
+
+        throw new RuntimeException("intro.wav and grab.wav not found. Most likely an incorrect sound folder was selected");
     } else {
         Scanner scanner = new Scanner(System.in);
 
