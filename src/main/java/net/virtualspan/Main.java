@@ -243,7 +243,6 @@ public class Main {
 
         // Paths to directories containing sprites
         Path actions = spriteSheetFolder.resolve("Actions");
-        Path emotes = spriteSheetFolder.resolve("Emotes");
         Path run = spriteSheetFolder.resolve("Run");
         Path walk = spriteSheetFolder.resolve("Walk");
 
@@ -287,12 +286,6 @@ public class Main {
                 new Path[]{actions.resolve(outroSprite), convertedSpriteFolder.resolve("outro.png")},
                 new Path[]{actions.resolve("runIdle.png"), convertedSpriteFolder.resolve("walk-idle.png")},
                 new Path[]{actions.resolve("sleep.png"), convertedSpriteFolder.resolve("sleep.png")},
-
-                // Emotes folder
-                new Path[]{emotes.resolve("emote1.png"), convertedSpriteFolder.resolve("emote1.png")},
-                new Path[]{emotes.resolve("emote2.png"), convertedSpriteFolder.resolve("emote2.png")},
-                new Path[]{emotes.resolve("emote3.png"), convertedSpriteFolder.resolve("emote3.png")},
-                new Path[]{emotes.resolve("emote4.png"), convertedSpriteFolder.resolve("emote4.png")},
 
                 // Run folder
                 new Path[]{run.resolve("downLeft.png"), convertedSpriteFolder.resolve("run-downleft.png")},

@@ -4,7 +4,7 @@ Converts Gremlins from [KurtVelasco's Desktop Gremlin](https://github.com/KurtVe
 ## Showcase
 https://github.com/user-attachments/assets/5dd9b373-9ef3-4c1d-a37d-8c2264886e79
 
-In case it wasn't clear, this should work for all Gremlins (except Koyuki mentioned below), not just Tamamo Cross.
+You can run this multiple times on the same Gremlin if you choose to customize any sprites/sounds differently. The old files will simply get overridden and this does not change any the files you choose to convert, only copies them to another location.
 
 IMPORTANT: Some Gremlins have their sprites found in both `SpriteSheet/Gremlins/<Gremlin-name>` and `SpriteSheet/Companions/<Gremlin-name>`. In this case make sure to use the sprites from `SpriteSheet/Gremlins/<Gremlin-name>` as the ones in the `Companions` folder typically has less sprites.
 
