@@ -158,6 +158,7 @@ public class Main {
         String emoteSpriteDefault;
         String patSpriteDefault;
         String pokeSprite;
+        String walkSound;
 
         // Edge case scenarios for when some files don't exist to convert
         if (Files.exists(spriteSheetFolder.resolve("Emotes/emote3.png"))) {
@@ -178,6 +179,12 @@ public class Main {
             pokeSprite = "Emotes/emote2.png";
         } else {
             pokeSprite = "Emotes/emote1.png";
+        }
+
+        if (Files.exists(soundFolder.resolve("walk.wav"))) {
+            walkSound = "walk.wav";
+        } else {
+            walkSound = "run.wav";
         }
 
         if (Files.exists(soundFolder.resolve("emote1.wav")) && !Files.exists(soundFolder.resolve("emote3.wav"))) {
@@ -316,9 +323,8 @@ public class Main {
                 new Path[]{soundFolder.resolve("outro.wav"), convertedSoundFolder.resolve("outro.wav")},
                 new Path[]{soundFolder.resolve("pat.wav"), convertedSoundFolder.resolve("pat.wav")},
                 new Path[]{soundFolder.resolve("poke.wav"), convertedSoundFolder.resolve("poke.wav")},
-                new Path[]{soundFolder.resolve("run.wav"), convertedSoundFolder.resolve("run.wav")},
                 new Path[]{soundFolder.resolve("sleep.wav"), convertedSoundFolder.resolve("sleep.wav")},
-                new Path[]{soundFolder.resolve("walk.wav"), convertedSoundFolder.resolve("walk.wav")},
+                new Path[]{soundFolder.resolve(walkSound), convertedSoundFolder.resolve("walk.wav")},
 
                 // Emote and other sounds (these sometimes don't have an original sound to copy and need placeholders)
                 new Path[]{soundFolder.resolve(emoteSoundChoice), convertedSoundFolder.resolve("emote.wav")},
@@ -409,40 +415,40 @@ public class Main {
 
         // Create File contents
         // sprite-map.json
-        List<String> jsonLines = new ArrayList<>();
+        List<String> spriteJsonLines = new ArrayList<>();
 
-        jsonLines.add("    \"FrameRate\": 60");
-        jsonLines.add("    \"SpriteColumn\": " + get(values, "COLUMN"));
-        jsonLines.add("    \"FrameHeight\": " + get(values, "HEIGHT"));
-        jsonLines.add("    \"FrameWidth\": " + get(values, "WIDTH"));
-        jsonLines.add("    \"TopHotspotHeight\": 175");
-        jsonLines.add("    \"TopHotspotWidth\": 150");
-        jsonLines.add("    \"SideHotspotHeight\": 0");
-        jsonLines.add("    \"SideHotspotWidth\": 0");
-        jsonLines.add("    \"HasReloadAnimation\": false");
+        spriteJsonLines.add("    \"FrameRate\": 60");
+        spriteJsonLines.add("    \"SpriteColumn\": " + get(values, "COLUMN"));
+        spriteJsonLines.add("    \"FrameHeight\": " + get(values, "HEIGHT"));
+        spriteJsonLines.add("    \"FrameWidth\": " + get(values, "WIDTH"));
+        spriteJsonLines.add("    \"TopHotspotHeight\": 175");
+        spriteJsonLines.add("    \"TopHotspotWidth\": 150");
+        spriteJsonLines.add("    \"SideHotspotHeight\": 0");
+        spriteJsonLines.add("    \"SideHotspotWidth\": 0");
+        spriteJsonLines.add("    \"HasReloadAnimation\": false");
 
-        List<SpriteEntry> entries = List.of(
-                new SpriteEntry("Idle", "idle.png"),
-                new SpriteEntry("Hover", "hover.png"),
-                new SpriteEntry("Sleep", "sleep.png"),
-                new SpriteEntry("Intro", "intro.png"),
-                new SpriteEntry("Outro", "outro.png"),
-                new SpriteEntry("Grab", "grab.png"),
-                new SpriteEntry("Up", "run-up.png"),
-                new SpriteEntry("Down", "run-down.png"),
-                new SpriteEntry("Left", "run-left.png"),
-                new SpriteEntry("Right", "run-right.png"),
-                new SpriteEntry("UpLeft", "run-upleft.png"),
-                new SpriteEntry("UpRight", "run-upright.png"),
-                new SpriteEntry("DownLeft", "run-downleft.png"),
-                new SpriteEntry("DownRight", "run-downright.png"),
-                new SpriteEntry("WalkIdle", "walk-idle.png"),
-                new SpriteEntry("Poke", "poke.png"),
-                new SpriteEntry("Pat", "pat.png"),
-                new SpriteEntry("LeftAction", "left-action.png"),
-                new SpriteEntry("RightAction", "right-action.png"),
-                new SpriteEntry("Reload", "reload.png"),
-                new SpriteEntry("Emote", "emote.png")
+        List<AssetEntry> spriteEntryList = List.of(
+                new AssetEntry("Idle", "idle.png"),
+                new AssetEntry("Hover", "hover.png"),
+                new AssetEntry("Sleep", "sleep.png"),
+                new AssetEntry("Intro", "intro.png"),
+                new AssetEntry("Outro", "outro.png"),
+                new AssetEntry("Grab", "grab.png"),
+                new AssetEntry("Up", "run-up.png"),
+                new AssetEntry("Down", "run-down.png"),
+                new AssetEntry("Left", "run-left.png"),
+                new AssetEntry("Right", "run-right.png"),
+                new AssetEntry("UpLeft", "run-upleft.png"),
+                new AssetEntry("UpRight", "run-upright.png"),
+                new AssetEntry("DownLeft", "run-downleft.png"),
+                new AssetEntry("DownRight", "run-downright.png"),
+                new AssetEntry("WalkIdle", "walk-idle.png"),
+                new AssetEntry("Poke", "poke.png"),
+                new AssetEntry("Pat", "pat.png"),
+                new AssetEntry("LeftAction", "left-action.png"),
+                new AssetEntry("RightAction", "right-action.png"),
+                new AssetEntry("Reload", "reload.png"),
+                new AssetEntry("Emote", "emote.png")
         );
 
         // If the file corresponding to the sprite exists, it shows the filename as normal
@@ -451,21 +457,21 @@ public class Main {
         // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
         Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
 
-        for (SpriteEntry entry : entries) {
-            Path currentFile = convertedSpriteFolder.resolve(entry.fileName());
+        for (AssetEntry entry : spriteEntryList) {
+            Path currentSpriteFile = convertedSpriteFolder.resolve(entry.fileName());
 
-            boolean exists = Files.exists(currentFile);
+            boolean exists = Files.exists(currentSpriteFile);
 
             String value = exists
                     ? entry.fileName()
                     : (skip.contains(entry.key()) ? "" : "idle.png");
 
-            jsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
+            spriteJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
         }
 
         String spriteSheetFile =
                 "{\n" +
-                        String.join(",\n", jsonLines) +
+                        String.join(",\n", spriteJsonLines) +
                         "\n}";
 
         // frame-count.json
@@ -511,20 +517,33 @@ public class Main {
                         "}";
 
         // sfx-map.json
-        String sfxMapFile = """
-                    {
-                        "Hover": "hover.wav",
-                        "Intro": "intro.wav",
-                        "Outro": "outro.wav",
-                        "Grab": "grab.wav",
-                        "Walk": "walk.wav",
-                        "Poke": "poke.wav",
-                        "Pat": "pat.wav",
-                        "LeftAction": "left-action.wav",
-                        "RightAction": "right-action.wav",
-                        "Reload": "outro.wav",
-                        "Emote": "emote.wav"
-                    }""";
+        List<String> soundJsonLines = new ArrayList<>();
+
+        List<AssetEntry> soundEntryList = List.of(
+                new AssetEntry("Hover", "hover.wav"),
+                new AssetEntry("Intro", "intro.wav"),
+                new AssetEntry("Outro", "outro.wav"),
+                new AssetEntry("Grab", "grab.wav"),
+                new AssetEntry("Walk", "walk.wav"),
+                new AssetEntry("Poke", "poke.wav"),
+                new AssetEntry("Pat", "pat.wav"),
+                new AssetEntry("LeftAction", "left-action.wav"),
+                new AssetEntry("RightAction", "right-action.wav"),
+                new AssetEntry("Reload", "reload.wav"),
+                new AssetEntry("Emote", "emote.wav")
+        );
+
+        // Shows the corresponding filename if it exists, else shows "" (none)
+        for (AssetEntry entry : soundEntryList) {
+            Path currentSoundFile = convertedSoundFolder.resolve(entry.fileName());
+            String value = Files.exists(currentSoundFile) ? entry.fileName() : "";
+            soundJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
+        }
+
+        String sfxMapFile =
+                "{\n" +
+                        String.join(",\n", soundJsonLines) +
+                        "\n}";
 
         // Write files
         try {
@@ -537,9 +556,9 @@ public class Main {
         }
 
         // Copies gremlin to .config directory if present
-        boolean gremlinsDireExists = Files.isDirectory(gremlinsDir);
+        boolean gremlinsDirExists = Files.isDirectory(gremlinsDir);
 
-        if (gremlinsDireExists) {
+        if (gremlinsDirExists) {
             try {
                 copyFolder(gremlinFolder, gremlinsDir.resolve(normalized));
             } catch (IOException e) {
@@ -640,7 +659,7 @@ public class Main {
         };
     }
 
-    private record SpriteEntry(String key, String fileName) {}
+    private record AssetEntry(String key, String fileName) {}
 
     private static void userCancel() {
         // Happens if user clicks cancel
