@@ -464,19 +464,31 @@ public class Main {
         // Else shows the filename for idle.png,
         // except if it's LeftAction, RightAction or Reload, then it shows none
         // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
+        // Also uses run-right and/or run-left sprites (depending on what's available)
+        // instead of idle.png if movement sprites don't exist
         Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
 
-        Set<String> movement = Set.of(
-                "Up", "Down", "Left", "Right",
-                "UpLeft", "UpRight", "DownLeft", "DownRight"
+        Set<String> rightMovementSprites = Set.of(
+                "Up", "Right", "UpRight", "DownRight"
+        );
+
+        Set<String> leftMovementSprites = Set.of(
+                "Down", "Left", "UpLeft", "DownLeft"
         );
 
         String runRightIfExists;
+        String runLeftIfExists;
 
         if (Files.exists(convertedSpriteFolder.resolve("run-right.png"))) {
             runRightIfExists = "run-right.png";
         } else {
             runRightIfExists = "idle.png";
+        }
+
+        if (Files.exists(convertedSpriteFolder.resolve("run-left.png"))) {
+            runLeftIfExists = "run-left.png";
+        } else {
+            runLeftIfExists = "idle.png";
         }
 
         for (AssetEntry entry : spriteEntryList) {
@@ -488,10 +500,13 @@ public class Main {
                     ? entry.fileName()
                     : (skip.contains(entry.key())
                         ? ""
-                        : movement.contains(entry.key())
+                        : rightMovementSprites.contains(entry.key())
                             ? runRightIfExists
-                            : "idle.png"
+                            : leftMovementSprites.contains(entry.key())
+                                ? runLeftIfExists
+                                : "idle.png"
                     );
+
 
             spriteJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
         }
@@ -510,21 +525,53 @@ public class Main {
             }
         }
 
-        // Movement sprites fall back to run-right.png if it exists, so this syncs frame count for that
-        Set<String> movementKeys = Set.of(
-                "RUNUP", "RUNDOWN", "RUNLEFT", "RUNRIGHT",
-                "UPLEFT", "UPRIGHT", "DOWNLEFT", "DOWNRIGHT"
+        // Movement sprites fall back to run-right.png and/or run-left.png if it exists, so this syncs frame count for that
+        Set<String> rightMovementKeys = Set.of(
+                "RUNUP", "RUNRIGHT", "UPRIGHT", "DOWNRIGHT"
         );
 
-        if (Files.exists(convertedSpriteFolder.resolve("run-right.png"))) {
+        Set<String> leftMovementKeys = Set.of(
+                "RUNDOWN", "RUNLEFT", "UPLEFT", "DOWNLEFT"
+        );
+
+        boolean hasRunRight = Files.exists(convertedSpriteFolder.resolve("run-right.png"));
+        boolean hasRunLeft  = Files.exists(convertedSpriteFolder.resolve("run-left.png"));
+
+        // If run-right exists, apply RUNRIGHT frames
+        if (hasRunRight) {
             int runRightFrames = get(values, "RUNRIGHT");
 
-            for (String key : movementKeys) {
+            // Always update right movement keys
+            for (String key : rightMovementKeys) {
                 values.put(key, runRightFrames);
+            }
+
+            // If run-left does NOT exist, left keys also fall back to run-right
+            if (!hasRunLeft) {
+                for (String key : leftMovementKeys) {
+                    values.put(key, runRightFrames);
+                }
             }
         }
 
-        // Hardcode fix for Gold Ship
+        // If run-left exists, apply RUNLEFT frames
+        if (hasRunLeft) {
+            int runLeftFrames = get(values, "RUNLEFT");
+
+            // Always update left movement keys
+            for (String key : leftMovementKeys) {
+                values.put(key, runLeftFrames);
+            }
+
+            // If run-right does NOT exist, right keys also fall back to run-left
+            if (!hasRunRight) {
+                for (String key : rightMovementKeys) {
+                    values.put(key, runLeftFrames);
+                }
+            }
+        }
+
+        // Hardcode frame count fix for Gold Ship
         if (normalized.equals("goldship")) {
             values.put("HOVER", 25);
             values.put("SLEEP", 50);

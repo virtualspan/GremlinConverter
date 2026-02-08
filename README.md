@@ -15,6 +15,4 @@ Check releases and download the .jar file from there.
 
 ## Incompatible Gremlins
 - Lemon  - this doesn't have an idle.png sprite which this converter doesn't work without.
-- Koyuki - this is due to differences in asset structure but [Xgameisdabest's fork](https://github.com/Xgameisdabest/linux-desktop-gremlin/tree/koyuki) contains a converted Koyuki gremlin which you can copy to your .config directory.
-
-Edit: As of posting this fork currently uses the old gremlin folder structure. Simply create a folder called `koyuki` and inside copy and rename the koyuki folder in the sounds folder from the repo as `sounds` and same for the one in the spritesheet folder as `sprites`. Then put the new `koyuki` folder in `~/linux-desktop-gremlin/gremlins`
+- Koyuki - this is due to differences in asset structure but this should already be available in the latest version of [linux-desktop-gremlin](https://github.com/iluvgirlswithglasses/linux-desktop-gremlin).
