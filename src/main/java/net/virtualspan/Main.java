@@ -524,6 +524,12 @@ public class Main {
             }
         }
 
+        // Hardcode fix for Gold Ship
+        if (normalized.equals("goldship")) {
+            values.put("HOVER", 25);
+            values.put("SLEEP", 50);
+        }
+
         String frameCountFile = "{\n" +
                 "    \"Idle\": " + get(values, "IDLE") + ",\n" +
                 "    \"Hover\": " + get(values, "HOVER") + ",\n" +

@@ -18,6 +18,3 @@ Check releases and download the .jar file from there.
 - Koyuki - this is due to differences in asset structure but [Xgameisdabest's fork](https://github.com/Xgameisdabest/linux-desktop-gremlin/tree/koyuki) contains a converted Koyuki gremlin which you can copy to your .config directory.
 
 Edit: As of posting this fork currently uses the old gremlin folder structure. Simply create a folder called `koyuki` and inside copy and rename the koyuki folder in the sounds folder from the repo as `sounds` and same for the one in the spritesheet folder as `sprites`. Then put the new `koyuki` folder in `~/linux-desktop-gremlin/gremlins`
-
-## Gremlin-Specific Issues
-- Gold Ship - The framerate for the hover sprite is causes some visual bugs. To fix this, edit `~/.config/linux-desktop-gremlin/gremlins/goldship/sprites/frame-count.json`, and change `"Hover": 30,` to `"Hover": 25,`.
