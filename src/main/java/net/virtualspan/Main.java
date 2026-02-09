@@ -1,18 +1,14 @@
 package net.virtualspan;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.UnsupportedAudioFileException;
 import javax.swing.*;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CancellationException;
-import java.util.stream.Stream;
+
+import static net.virtualspan.FileUtils.copyFolder;
+import static net.virtualspan.FileUtils.ioExceptionPrompt;
 
 public class Main {
     static void main() {
@@ -79,11 +75,11 @@ public class Main {
 
         // Get folder name for gremlin
         String folderName = spriteSheetFolder.getFileName().toString();
-        String normalized = folderName.toLowerCase().replace(" ", "-");
+        String normalised = folderName.toLowerCase().replace(" ", "-");
 
         // Export Folder Paths
         Path exportFolder = Path.of(System.getProperty("user.home"), "ConvertedGremlins");
-        Path gremlinFolder = exportFolder.resolve(normalized);
+        Path gremlinFolder = exportFolder.resolve(normalised);
         Path convertedSpriteFolder = gremlinFolder.resolve("sprites");
         Path convertedSoundFolder = gremlinFolder.resolve("sounds");
 
@@ -282,362 +278,23 @@ public class Main {
         Path actions = spriteSheetFolder.resolve("Actions");
         Path run = spriteSheetFolder.resolve("Run");
 
-        // Copies and renames hover.png or idle.png to intro.png and outro.png as a placeholder if they aren't present
-        // This fixes issues with starting/closing the Gremlin and gets overridden if they are present
+        // Shared variables between classes
         String introSprite = "intro.png";
         String outroSprite = "outro.png";
-
-        try {
-            if (!Files.exists(actions.resolve("intro.png"))) {
-                Files.copy(actions.resolve("idle.png"),
-                        convertedSpriteFolder.resolve("intro.png"), StandardCopyOption.REPLACE_EXISTING);
-
-                introSprite = "idle.png";
-            }
-
-            if (!Files.exists(actions.resolve("outro.png"))) {
-                if (Files.exists(actions.resolve("hover.png"))) {
-                    Files.copy(actions.resolve("grab.png"),
-                            convertedSpriteFolder.resolve("outro.png"), StandardCopyOption.REPLACE_EXISTING);
-
-                    outroSprite = "grab.png";
-                } else {
-                    Files.copy(actions.resolve("idle.png"),
-                            convertedSpriteFolder.resolve("outro.png"), StandardCopyOption.REPLACE_EXISTING);
-
-                    outroSprite = "idle.png";
-                }
-            }
-        } catch (IOException e) {
-            ioExceptionPrompt("Failed to copy and rename to intro/outro.png placeholder files", e);
-        }
-
-        // List of copy operations
-        List<Path[]> copies = List.of(
-                // Actions folder
-                new Path[]{actions.resolve("grab.png"), convertedSpriteFolder.resolve("grab.png")},
-                new Path[]{actions.resolve("hover.png"), convertedSpriteFolder.resolve("hover.png")},
-                new Path[]{actions.resolve("idle.png"), convertedSpriteFolder.resolve("idle.png")},
-                new Path[]{actions.resolve(introSprite), convertedSpriteFolder.resolve("intro.png")},
-                new Path[]{actions.resolve(outroSprite), convertedSpriteFolder.resolve("outro.png")},
-                new Path[]{actions.resolve("runIdle.png"), convertedSpriteFolder.resolve("walk-idle.png")},
-                new Path[]{actions.resolve("sleep.png"), convertedSpriteFolder.resolve("sleep.png")},
-
-                // Run folder
-                new Path[]{run.resolve("downLeft.png"), convertedSpriteFolder.resolve("run-downleft.png")},
-                new Path[]{run.resolve("downRight.png"), convertedSpriteFolder.resolve("run-downright.png")},
-                new Path[]{run.resolve("runDown.png"), convertedSpriteFolder.resolve("run-down.png")},
-                new Path[]{run.resolve("runLeft.png"), convertedSpriteFolder.resolve("run-left.png")},
-                new Path[]{run.resolve("runRight.png"), convertedSpriteFolder.resolve("run-right.png")},
-                new Path[]{run.resolve("runUp.png"), convertedSpriteFolder.resolve("run-up.png")},
-                new Path[]{run.resolve("upLeft.png"), convertedSpriteFolder.resolve("run-upleft.png")},
-                new Path[]{run.resolve("upRight.png"), convertedSpriteFolder.resolve("run-upright.png")},
-
-                // Emote and idle sprites converted to other files
-                new Path[]{spriteSheetFolder.resolve(emoteSpriteChoice), convertedSpriteFolder.resolve("emote.png")},
-                new Path[]{spriteSheetFolder.resolve(patSpriteChoice), convertedSpriteFolder.resolve("pat.png")},
-                new Path[]{spriteSheetFolder.resolve(pokeSprite), convertedSpriteFolder.resolve("poke.png")},
-
-                // Sounds folder
-                new Path[]{soundFolder.resolve("emote.wav"), convertedSoundFolder.resolve("emote.wav")},
-                new Path[]{soundFolder.resolve("grab.wav"), convertedSoundFolder.resolve("grab.wav")},
-                new Path[]{soundFolder.resolve("hover.wav"), convertedSoundFolder.resolve("hover.wav")},
-                new Path[]{soundFolder.resolve("intro.wav"), convertedSoundFolder.resolve("intro.wav")},
-                new Path[]{soundFolder.resolve("outro.wav"), convertedSoundFolder.resolve("outro.wav")},
-                new Path[]{soundFolder.resolve("pat.wav"), convertedSoundFolder.resolve("pat.wav")},
-                new Path[]{soundFolder.resolve("poke.wav"), convertedSoundFolder.resolve("poke.wav")},
-                new Path[]{soundFolder.resolve("sleep.wav"), convertedSoundFolder.resolve("sleep.wav")},
-                new Path[]{soundFolder.resolve(walkSound), convertedSoundFolder.resolve("walk.wav")},
-
-                // Emote and other sounds (these sometimes don't have an original sound to copy and need placeholders)
-                new Path[]{soundFolder.resolve(emoteSoundChoice), convertedSoundFolder.resolve("emote.wav")},
-                new Path[]{soundFolder.resolve("emote2.wav"), convertedSoundFolder.resolve("poke.wav")},
-                new Path[]{soundFolder.resolve(patSound), convertedSoundFolder.resolve("pat.wav")}
-        );
-
-        // Perform all copies
-        for (Path[] pair : copies) {
-            try {
-                copyFile(pair[0], pair[1]);
-            } catch (IOException e) {
-                ioExceptionPrompt("Failed copying from " + pair[0] + " to " + pair[1], e);
-            }
-        }
-
-        // Read config.txt
+        Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
         Map<String, Integer> values = new HashMap<>();
 
-        try (Stream<String> lines = Files.lines(originalConfigPath)) {
-            lines.forEach(line -> {
-                line = line.trim();
+        // Return back Strings from classes
+        String frameCountFile = FrameCountProcessor.process(originalConfigPath, convertedSpriteFolder, emoteSpriteChoice,
+                patSpriteChoice, pokeSprite, introSprite, outroSprite, normalised, skip, values);
 
-                // Skip comments and empty lines
-                if (line.isEmpty() || line.startsWith("//")) return;
+        String spriteSheetFile = SpriteProcessor.process(spriteSheetFolder, convertedSpriteFolder, actions,
+                run, introSprite, outroSprite, emoteSpriteChoice,
+                patSpriteChoice, pokeSprite, skip, values);
 
-                // Skip SCALE
-                if (line.startsWith("SCALE")) return;
-
-                // Expect KEY=value
-                String[] parts = line.split("=");
-                if (parts.length != 2) return;
-
-                String key = parts[0].trim();
-                String val = parts[1].trim();
-
-                try {
-                    values.put(key, Integer.parseInt(val));
-                } catch (NumberFormatException ignored) {
-                    // Skip non-integer values
-                }
-            });
-        } catch (IOException e) {
-            ioExceptionPrompt("Failed to read config.txt", e);
-        }
-
-        // Sync choices/sprites with the equivalent key for proper frame count
-        String emoteKey = convertSpriteToKey(emoteSpriteChoice);
-        String patKey = convertSpriteToKey(patSpriteChoice);
-        String pokeKey = convertSpriteToKey(pokeSprite);
-        String introKey = convertSpriteToKey(introSprite);
-        String outroKey = convertSpriteToKey(outroSprite);
-
-        // Calculate emote duration for emote config
-        Path soundFile = soundFolder.resolve(emoteSoundChoice);
-        File file = soundFile.toFile();
-        AudioInputStream ais = null;
-        int durationMs;
-        try {
-            ais = AudioSystem.getAudioInputStream(file);
-        } catch (UnsupportedAudioFileException | IOException _) {
-        }
-        AudioFormat format;
-        if (ais != null) {
-            format = ais.getFormat();
-
-            long frames = ais.getFrameLength();
-            float frameRate = format.getFrameRate();
-
-            durationMs = (int) Math.ceil((frames / frameRate) * 1000);
-        } else {
-            durationMs = 0;
-        }
-
-        // Create File contents
-        // sprite-map.json
-        List<String> spriteJsonLines = new ArrayList<>();
-
-        spriteJsonLines.add("    \"FrameRate\": 60");
-        spriteJsonLines.add("    \"SpriteColumn\": " + get(values, "COLUMN"));
-        spriteJsonLines.add("    \"FrameHeight\": " + get(values, "HEIGHT"));
-        spriteJsonLines.add("    \"FrameWidth\": " + get(values, "WIDTH"));
-        spriteJsonLines.add("    \"TopHotspotHeight\": 175");
-        spriteJsonLines.add("    \"TopHotspotWidth\": 150");
-        spriteJsonLines.add("    \"SideHotspotHeight\": 0");
-        spriteJsonLines.add("    \"SideHotspotWidth\": 0");
-        spriteJsonLines.add("    \"HasReloadAnimation\": false");
-
-        List<AssetEntry> spriteEntryList = List.of(
-                new AssetEntry("Idle", "idle.png"),
-                new AssetEntry("Hover", "hover.png"),
-                new AssetEntry("Sleep", "sleep.png"),
-                new AssetEntry("Intro", "intro.png"),
-                new AssetEntry("Outro", "outro.png"),
-                new AssetEntry("Grab", "grab.png"),
-                new AssetEntry("Up", "run-up.png"),
-                new AssetEntry("Down", "run-down.png"),
-                new AssetEntry("Left", "run-left.png"),
-                new AssetEntry("Right", "run-right.png"),
-                new AssetEntry("UpLeft", "run-upleft.png"),
-                new AssetEntry("UpRight", "run-upright.png"),
-                new AssetEntry("DownLeft", "run-downleft.png"),
-                new AssetEntry("DownRight", "run-downright.png"),
-                new AssetEntry("WalkIdle", "walk-idle.png"),
-                new AssetEntry("Poke", "poke.png"),
-                new AssetEntry("Pat", "pat.png"),
-                new AssetEntry("LeftAction", "left-action.png"),
-                new AssetEntry("RightAction", "right-action.png"),
-                new AssetEntry("Reload", "reload.png"),
-                new AssetEntry("Emote", "emote.png")
-        );
-
-        // If the file corresponding to the sprite exists, it shows the filename as normal
-        // Else shows the filename for idle.png,
-        // except if it's LeftAction, RightAction or Reload, then it shows none
-        // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
-        // Also uses run-right and/or run-left sprites (depending on what's available)
-        // instead of idle.png if movement sprites don't exist
-        Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
-
-        Set<String> rightMovementSprites = Set.of(
-                "Up", "Right", "UpRight", "DownRight"
-        );
-
-        Set<String> leftMovementSprites = Set.of(
-                "Down", "Left", "UpLeft", "DownLeft"
-        );
-
-        String runRightIfExists;
-        String runLeftIfExists;
-
-        if (Files.exists(convertedSpriteFolder.resolve("run-right.png"))) {
-            runRightIfExists = "run-right.png";
-        } else {
-            runRightIfExists = "idle.png";
-        }
-
-        if (Files.exists(convertedSpriteFolder.resolve("run-left.png"))) {
-            runLeftIfExists = "run-left.png";
-        } else {
-            runLeftIfExists = "idle.png";
-        }
-
-        for (AssetEntry entry : spriteEntryList) {
-            Path currentSpriteFile = convertedSpriteFolder.resolve(entry.fileName());
-
-            boolean exists = Files.exists(currentSpriteFile);
-
-            String value = exists
-                    ? entry.fileName()
-                    : (skip.contains(entry.key())
-                        ? ""
-                        : rightMovementSprites.contains(entry.key())
-                            ? runRightIfExists
-                            : leftMovementSprites.contains(entry.key())
-                                ? runLeftIfExists
-                                : "idle.png"
-                    );
-
-
-            spriteJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
-        }
-
-        String spriteSheetFile =
-                "{\n" +
-                        String.join(",\n", spriteJsonLines) +
-                        "\n}";
-
-        // frame-count.json
-        // The idle sprite replaces missing sprites (except LeftAction, RightAction and Reload)
-        // Therefore, this makes the frame count sync by using the idle frame count for them
-        for (String key : values.keySet()) {
-            if (get(values, key) == 0 && !skip.contains(key)) {
-                values.put(key, get(values, "IDLE"));
-            }
-        }
-
-        // Movement sprites fall back to run-right.png and/or run-left.png if it exists, so this syncs frame count for that
-        Set<String> rightMovementKeys = Set.of(
-                "RUNUP", "RUNRIGHT", "UPRIGHT", "DOWNRIGHT"
-        );
-
-        Set<String> leftMovementKeys = Set.of(
-                "RUNDOWN", "RUNLEFT", "UPLEFT", "DOWNLEFT"
-        );
-
-        boolean hasRunRight = Files.exists(convertedSpriteFolder.resolve("run-right.png"));
-        boolean hasRunLeft  = Files.exists(convertedSpriteFolder.resolve("run-left.png"));
-
-        // If run-right exists, apply RUNRIGHT frames
-        if (hasRunRight) {
-            int runRightFrames = get(values, "RUNRIGHT");
-
-            // Always update right movement keys
-            for (String key : rightMovementKeys) {
-                values.put(key, runRightFrames);
-            }
-
-            // If run-left does NOT exist, left keys also fall back to run-right
-            if (!hasRunLeft) {
-                for (String key : leftMovementKeys) {
-                    values.put(key, runRightFrames);
-                }
-            }
-        }
-
-        // If run-left exists, apply RUNLEFT frames
-        if (hasRunLeft) {
-            int runLeftFrames = get(values, "RUNLEFT");
-
-            // Always update left movement keys
-            for (String key : leftMovementKeys) {
-                values.put(key, runLeftFrames);
-            }
-
-            // If run-right does NOT exist, right keys also fall back to run-left
-            if (!hasRunRight) {
-                for (String key : rightMovementKeys) {
-                    values.put(key, runLeftFrames);
-                }
-            }
-        }
-
-        // Hardcode frame count fix for Gold Ship
-        if (normalized.equals("goldship")) {
-            values.put("HOVER", 25);
-            values.put("SLEEP", 50);
-        }
-
-        String frameCountFile = "{\n" +
-                "    \"Idle\": " + get(values, "IDLE") + ",\n" +
-                "    \"Hover\": " + get(values, "HOVER") + ",\n" +
-                "    \"Sleep\": " + get(values, "SLEEP") + ",\n" +
-                "    \"Intro\": " + get(values, introKey) + ",\n" +
-                "    \"Outro\": " + get(values, outroKey) + ",\n" +
-                "    \"Grab\": " + get(values, "GRAB") + ",\n" +
-                "    \"Up\": " + get(values, "RUNUP") + ",\n" +
-                "    \"Down\": " + get(values, "RUNDOWN") + ",\n" +
-                "    \"Left\": " + get(values, "RUNLEFT") + ",\n" +
-                "    \"Right\": " + get(values, "RUNRIGHT") + ",\n" +
-                "    \"UpLeft\": " + get(values, "UPLEFT") + ",\n" +
-                "    \"UpRight\": " + get(values, "UPRIGHT") + ",\n" +
-                "    \"DownLeft\": " + get(values, "DOWNLEFT") + ",\n" +
-                "    \"DownRight\": " + get(values, "DOWNRIGHT") + ",\n" +
-                "    \"WalkIdle\": " + get(values, "RUNIDLE") + ",\n" +
-                "    \"Poke\": " + get(values, pokeKey) + ",\n" +
-                "    \"Pat\": " + get(values, patKey) + ",\n" +
-                "    \"LeftAction\": 0,\n" +
-                "    \"RightAction\": 0,\n" +
-                "    \"Reload\": 0,\n" +
-                "    \"Emote\": " + get(values, emoteKey) + "\n" +
-                "}";
-
-        // emote-config.json
-        String emoteConfigFile =
-                "{\n" +
-                        "    \"AnnoyEmote\": true,\n" +
-                        "    \"MinEmoteTriggerMinutes\": 5,\n" +
-                        "    \"MaxEmoteTriggerMinutes\": 15,\n" +
-                        "    \"EmoteDuration\": " + durationMs + "\n" +
-                        "}";
-
-        // sfx-map.json
-        List<String> soundJsonLines = new ArrayList<>();
-
-        List<AssetEntry> soundEntryList = List.of(
-                new AssetEntry("Hover", "hover.wav"),
-                new AssetEntry("Intro", "intro.wav"),
-                new AssetEntry("Outro", "outro.wav"),
-                new AssetEntry("Grab", "grab.wav"),
-                new AssetEntry("Walk", "walk.wav"),
-                new AssetEntry("Poke", "poke.wav"),
-                new AssetEntry("Pat", "pat.wav"),
-                new AssetEntry("LeftAction", "left-action.wav"),
-                new AssetEntry("RightAction", "right-action.wav"),
-                new AssetEntry("Reload", "reload.wav"),
-                new AssetEntry("Emote", "emote.wav")
-        );
-
-        // Shows the corresponding filename if it exists, else shows "" (none)
-        for (AssetEntry entry : soundEntryList) {
-            Path currentSoundFile = convertedSoundFolder.resolve(entry.fileName());
-            String value = Files.exists(currentSoundFile) ? entry.fileName() : "";
-            soundJsonLines.add("    \"" + entry.key() + "\": \"" + value + "\"");
-        }
-
-        String sfxMapFile =
-                "{\n" +
-                        String.join(",\n", soundJsonLines) +
-                        "\n}";
+        SoundResult sound = SoundProcessor.process(soundFolder, convertedSoundFolder, walkSound, emoteSoundChoice, patSound);
+        String emoteConfigFile = sound.emoteConfig();
+        String sfxMapFile = sound.sfxMap();
 
         // Write files
         try {
@@ -654,7 +311,7 @@ public class Main {
 
         if (gremlinsDirExists) {
             try {
-                copyFolder(gremlinFolder, gremlinsDir.resolve(normalized));
+                copyFolder(gremlinFolder, gremlinsDir.resolve(normalised));
             } catch (IOException e) {
                 ioExceptionPrompt("Failed to copy converted files to .config directory (even though it exists)", e);
             }
@@ -688,34 +345,6 @@ public class Main {
         scanner.close();
         }
     }
-    static void copyFile(Path from, Path to) throws IOException {
-        if (!Files.exists(from)) {
-            return; // Skip missing files
-        }
-
-        Files.createDirectories(to.getParent());
-        Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    private static void copyFolder(Path source, Path target) throws IOException {
-        try (Stream<Path> stream = Files.walk(source)) {
-            stream.forEach(path -> {
-                try {
-                    Path relative = source.relativize(path);
-                    Path destination = target.resolve(relative);
-
-                    if (Files.isDirectory(path)) {
-                        Files.createDirectories(destination);
-                    } else {
-                        Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                } catch (IOException e) {
-                    ioExceptionPrompt("Failed to copy folder at:" + path, e);
-                }
-            });
-        }
-    }
-
     private static String chooseSprite(String message, String title, String[] Options) {
         String selectedDisplay = (String) JOptionPane.showInputDialog(
                 null,
@@ -734,27 +363,6 @@ public class Main {
         return selectedDisplay;
     }
 
-    private static int get(Map<String, Integer> map, String key) {
-        return map.getOrDefault(key, 0);
-    }
-
-    private static String convertSpriteToKey(String choice) {
-        return switch (choice) {
-            case "Emotes/emote1.png" -> "EMOTE1";
-            case "Emotes/emote2.png" -> "EMOTE2";
-            case "Emotes/emote3.png" -> "EMOTE3";
-            case "Emotes/emote4.png" -> "EMOTE4";
-            case "Actions/idle.png"  -> "IDLE";
-            case "Actions/click.png"  -> "CLICK";
-            case "intro.png"  -> "INTRO";
-            case "outro.png"  -> "OUTRO";
-            case "grab.png"  -> "GRAB";
-            default -> null;
-        };
-    }
-
-    private record AssetEntry(String key, String fileName) {}
-
     private static void userCancel() {
         // Happens if user clicks cancel
         JOptionPane.showMessageDialog(
@@ -765,21 +373,5 @@ public class Main {
         );
 
         throw new CancellationException("User cancelled conversion");
-    }
-
-    private static void ioExceptionPrompt(String message, IOException e) {
-        // Happens if user clicks cancel
-        JOptionPane.showMessageDialog(
-                null,
-                "An unexpected file operation error occurred. This shouldn’t happen during normal use. Please report this issue.",
-                "Conversion Failed",
-                JOptionPane.ERROR_MESSAGE
-        );
-
-        throw new RuntimeException(
-                "\n\nUnexpected IOException: " + message +
-                        "\nCause: " + e.getMessage() + "\n\n",
-                e
-        );
     }
 }
