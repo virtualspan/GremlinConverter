@@ -1,47 +1,21 @@
-package net.virtualspan;
+package net.virtualspan.processors;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
-
-
-import static net.virtualspan.FileUtils.ioExceptionPrompt;
 
 public class FrameCountProcessor {
-    public static String process(Path originalConfigPath, Path convertedSpriteFolder, String emoteSpriteChoice,
-                               String patSpriteChoice, String pokeSprite, String introSprite, String outroSprite,
-                               String normalised, Set<String> skip, Map<String, Integer> values) {
-        // Read config.txt
-        try (Stream<String> lines = Files.lines(originalConfigPath)) {
-            lines.forEach(line -> {
-                line = line.trim();
-
-                // Skip comments and empty lines
-                if (line.isEmpty() || line.startsWith("//")) return;
-
-                // Skip SCALE
-                if (line.startsWith("SCALE")) return;
-
-                // Expect KEY=value
-                String[] parts = line.split("=");
-                if (parts.length != 2) return;
-
-                String key = parts[0].trim();
-                String val = parts[1].trim();
-
-                try {
-                    values.put(key, Integer.parseInt(val));
-                } catch (NumberFormatException ignored) {
-                    // Skip non-integer values
-                }
-            });
-        } catch (IOException e) {
-            ioExceptionPrompt("Failed to read config.txt", e);
-        }
-
+    public static String process(
+            Path convertedSpriteFolder,
+            String emoteSpriteChoice,
+            String patSpriteChoice,
+            String pokeSprite,
+            String introSprite,
+            String outroSprite,
+            String normalised,
+            Set<String> skip,
+            Map<String, Integer> values) {
         // Sync choices/sprites with the equivalent key for proper frame count
         String emoteKey = convertSpriteToKey(emoteSpriteChoice);
         String patKey = convertSpriteToKey(patSpriteChoice);

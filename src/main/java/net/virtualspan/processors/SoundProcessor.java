@@ -1,4 +1,7 @@
-package net.virtualspan;
+package net.virtualspan.processors;
+
+import net.virtualspan.model.SoundResult;
+import net.virtualspan.model.AssetEntry;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -15,8 +18,12 @@ import static net.virtualspan.FileUtils.copyFile;
 import static net.virtualspan.FileUtils.ioExceptionPrompt;
 
 public class SoundProcessor {
-    public static SoundResult process(Path soundFolder, Path convertedSoundFolder, String walkSound,
-                               String emoteSoundChoice, String patSound) {
+    public static SoundResult process(
+            Path soundFolder,
+            Path convertedSoundFolder,
+            String walkSound,
+            String emoteSoundChoice,
+            String patSound) {
         // List of copy operations
         List<Path[]> soundCopies = List.of(
                 // Sounds folder

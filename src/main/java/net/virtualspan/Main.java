@@ -1,5 +1,11 @@
 package net.virtualspan;
 
+import net.virtualspan.model.SoundResult;
+import net.virtualspan.model.SpriteResult;
+import net.virtualspan.processors.FrameCountProcessor;
+import net.virtualspan.processors.SoundProcessor;
+import net.virtualspan.processors.SpriteProcessor;
+
 import javax.swing.*;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -274,27 +280,45 @@ public class Main {
             ioExceptionPrompt("Failed to create export directories", e);
         }
 
-        // Paths to directories containing sprites
-        Path actions = spriteSheetFolder.resolve("Actions");
-        Path run = spriteSheetFolder.resolve("Run");
+        // Pull in records from classes
+        SpriteResult spriteSheet = SpriteProcessor.process(
+                spriteSheetFolder,
+                convertedSpriteFolder,
+                originalConfigPath,
+                emoteSpriteChoice,
+                patSpriteChoice,
+                pokeSprite);
 
-        // Shared variables between classes
-        String introSprite = "intro.png";
-        String outroSprite = "outro.png";
-        Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
-        Map<String, Integer> values = new HashMap<>();
+        SoundResult sound = SoundProcessor.process(
+                soundFolder,
+                convertedSoundFolder,
+                walkSound,
+                emoteSoundChoice,
+                patSound);
 
-        // Return back Strings from classes
-        String frameCountFile = FrameCountProcessor.process(originalConfigPath, convertedSpriteFolder, emoteSpriteChoice,
-                patSpriteChoice, pokeSprite, introSprite, outroSprite, normalised, skip, values);
+        // Return back variables from records/classes
+        String introSprite = spriteSheet.introSprite();
+        String outroSprite = spriteSheet.outroSprite();
+        Set<String> skip = spriteSheet.skip();
+        Map<String, Integer> values = spriteSheet.values();
 
-        String spriteSheetFile = SpriteProcessor.process(spriteSheetFolder, convertedSpriteFolder, actions,
-                run, introSprite, outroSprite, emoteSpriteChoice,
-                patSpriteChoice, pokeSprite, skip, values);
+        // Return file Strings from records/classes
+        String spriteSheetFile = spriteSheet.spriteMap();
 
-        SoundResult sound = SoundProcessor.process(soundFolder, convertedSoundFolder, walkSound, emoteSoundChoice, patSound);
-        String emoteConfigFile = sound.emoteConfig();
+        String frameCountFile = FrameCountProcessor.process(
+                convertedSpriteFolder,
+                emoteSpriteChoice,
+                patSpriteChoice,
+                pokeSprite,
+                introSprite,
+                outroSprite,
+                normalised,
+                skip,
+                values);
+
         String sfxMapFile = sound.sfxMap();
+
+        String emoteConfigFile = sound.emoteConfig();
 
         // Write files
         try {

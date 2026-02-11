@@ -1,23 +1,34 @@
-package net.virtualspan;
+package net.virtualspan.processors;
+
+import net.virtualspan.model.AssetEntry;
+import net.virtualspan.model.SpriteResult;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Stream;
 
 import static net.virtualspan.FileUtils.copyFile;
 import static net.virtualspan.FileUtils.ioExceptionPrompt;
 
 public class SpriteProcessor {
-    public static String process(Path spriteSheetFolder, Path convertedSpriteFolder, Path actions,
-                               Path run, String introSprite, String outroSprite, String emoteSpriteChoice,
-                               String patSpriteChoice, String pokeSprite, Set<String> skip, Map<String, Integer> values) {
+    public static SpriteResult process(
+            Path spriteSheetFolder,
+            Path convertedSpriteFolder,
+            Path originalConfigPath,
+            String emoteSpriteChoice,
+            String patSpriteChoice,
+            String pokeSprite) {
+        // Paths to directories containing sprites
+        Path actions = spriteSheetFolder.resolve("Actions");
+        Path run = spriteSheetFolder.resolve("Run");
+
         // Copies and renames hover.png or idle.png to intro.png and outro.png as a placeholder if they aren't present
         // This fixes issues with starting/closing the Gremlin and gets overridden if they are present
+        String introSprite = "intro.png";
+        String outroSprite = "outro.png";
 
         try {
             if (!Files.exists(actions.resolve("intro.png"))) {
@@ -81,6 +92,36 @@ public class SpriteProcessor {
             }
         }
 
+        // Read config.txt
+        Map<String, Integer> values = new HashMap<>();
+
+        try (Stream<String> lines = Files.lines(originalConfigPath)) {
+            lines.forEach(line -> {
+                line = line.trim();
+
+                // Skip comments and empty lines
+                if (line.isEmpty() || line.startsWith("//")) return;
+
+                // Skip SCALE
+                if (line.startsWith("SCALE")) return;
+
+                // Expect KEY=value
+                String[] parts = line.split("=");
+                if (parts.length != 2) return;
+
+                String key = parts[0].trim();
+                String val = parts[1].trim();
+
+                try {
+                    values.put(key, Integer.parseInt(val));
+                } catch (NumberFormatException ignored) {
+                    // Skip non-integer values
+                }
+            });
+        } catch (IOException e) {
+            ioExceptionPrompt("Failed to read config.txt", e);
+        }
+
         // sprite-map.json
         List<String> spriteJsonLines = new ArrayList<>();
 
@@ -124,6 +165,8 @@ public class SpriteProcessor {
         // This fixes issues with low-sprite gremlins from being stuck and repeating a sprite
         // Also uses run-right and/or run-left sprites (depending on what's available)
         // instead of idle.png if movement sprites don't exist
+        Set<String> skip = Set.of("LeftAction", "RightAction", "Reload");
+
         Set<String> rightMovementSprites = Set.of(
                 "Up", "Right", "UpRight", "DownRight"
         );
@@ -171,6 +214,6 @@ public class SpriteProcessor {
                         String.join(",\n", spriteJsonLines) +
                         "\n}";
 
-        return spriteSheetFile;
+        return new SpriteResult(spriteSheetFile, introSprite, outroSprite, skip, values);
     }
 }
